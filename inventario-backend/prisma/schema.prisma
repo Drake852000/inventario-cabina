@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum TipoMovimiento {
+  ENTRADA
+  SALIDA
+  AJUSTE
+}
+
+enum MetodoPago {
+  EFECTIVO
+  YAPE
+  PLIN
+  OTRO
+}
+
+model Rol {
+  id       Int       @id @default(autoincrement())
+  nombre   String    @unique
+  usuarios Usuario[]
+}
+
+model Usuario {
+  id            Int       @id @default(autoincrement())
+  nombre        String
+  email         String    @unique
+  password_hash String
+  activo        Boolean   @default(true)
+  creado_en     DateTime  @default(now())
+
+  rol_id Int
+  rol    Rol      @relation(fields: [rol_id], references: [id])
+
+  movimientos MovimientoInventario[]
+  ventas      Venta[]
+}
+
+model Categoria {
+  id          Int        @id @default(autoincrement())
+  nombre      String     @unique
+  descripcion String?
+  activo      Boolean    @default(true)
+
+  productos   Producto[]
+}
+
+model Producto {
+  id           Int       @id @default(autoincrement())
+  nombre       String
+  descripcion  String?
+  precio_costo Float     @default(0)
+  precio_venta Float     @default(0)
+  stock_actual Int       @default(0)
+  stock_minimo Int       @default(0)
+  activo       Boolean   @default(true)
+  creado_en    DateTime  @default(now())
+
+  categoria_id Int?
+  categoria    Categoria? @relation(fields: [categoria_id], references: [id])
+
+  movimientos MovimientoInventario[]
+  detalles    VentaDetalle[]
+}
+
+model MovimientoInventario {
+  id             Int            @id @default(autoincrement())
+  tipo           TipoMovimiento
+  cantidad       Int
+  stock_anterior Int
+  stock_nuevo    Int
+  motivo         String?
+  creado_en      DateTime       @default(now())
+
+  producto_id Int
+  usuario_id  Int
+
+  producto Producto @relation(fields: [producto_id], references: [id])
+  usuario  Usuario  @relation(fields: [usuario_id], references: [id])
+}
+
+model Venta {
+  id            Int          @id @default(autoincrement())
+  fecha         DateTime     @default(now())
+  total         Float
+  metodo_pago   MetodoPago   @default(EFECTIVO)
+  cliente_nombre String?
+  nota          String?
+
+  usuario_id Int
+  usuario    Usuario      @relation(fields: [usuario_id], references: [id])
+
+  detalles   VentaDetalle[]
+}
+
+model VentaDetalle {
+  id             Int     @id @default(autoincrement())
+  cantidad       Int
+  precio_unitario Float
+  subtotal        Float
+
+  venta_id    Int
+  producto_id Int
+
+  venta    Venta    @relation(fields: [venta_id], references: [id])
+  producto Producto @relation(fields: [producto_id], references: [id])
+}
