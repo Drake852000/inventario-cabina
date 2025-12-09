@@ -37,9 +37,11 @@ model Usuario {
   rol_id Int
   rol    Rol      @relation(fields: [rol_id], references: [id])
 
-  movimientos MovimientoInventario[]
-  ventas      Venta[]
+  movimientos   MovimientoInventario[]
+  ventas        Venta[]
+  refreshTokens RefreshToken[]   // 👈 agrega esta línea
 }
+
 
 model Categoria {
   id          Int        @id @default(autoincrement())
@@ -109,4 +111,14 @@ model VentaDetalle {
 
   venta    Venta    @relation(fields: [venta_id], references: [id])
   producto Producto @relation(fields: [producto_id], references: [id])
+}
+
+model RefreshToken {
+  id         Int      @id @default(autoincrement())
+  token      String   @unique
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id])
+  usuarioId  Int
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+  revoked    Boolean  @default(false)
 }
