@@ -1,12 +1,17 @@
 // src/controllers/auth.controller.js
+
 const prisma = require('../prisma');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
-const ACCESS_TOKEN_EXP = '1h';      // token de acceso dura 1 hora
-const REFRESH_TOKEN_DIAS = 7;      // refresh token dura 7 días
+// Duración de los tokens
+const ACCESS_TOKEN_EXP = '1h';
+const REFRESH_TOKEN_DIAS = 7;
 
+// =========================
+// GENERADORES DE TOKENS
+// =========================
 function generarAccessToken(usuario) {
   return jwt.sign(
     {
@@ -23,11 +28,14 @@ function generarRefreshToken() {
   return crypto.randomBytes(40).toString('hex');
 }
 
+// =========================
 // LOGIN
+// =========================
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Buscar usuario
     const usuario = await prisma.usuario.findUnique({
       where: { email },
       include: { rol: true }
@@ -37,6 +45,7 @@ exports.login = async (req, res) => {
       return res.status(404).json({ msg: 'Usuario no encontrado' });
     }
 
+    // Verificar contraseña
     const valido = bcrypt.compareSync(password, usuario.password_hash);
     if (!valido) {
       return res.status(401).json({ msg: 'Contraseña incorrecta' });
@@ -46,7 +55,7 @@ exports.login = async (req, res) => {
     const accessToken = generarAccessToken(usuario);
     const refreshToken = generarRefreshToken();
 
-    // Calcular expiración del refresh token
+    // Expiración del refresh token
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_DIAS);
 
@@ -59,7 +68,8 @@ exports.login = async (req, res) => {
       }
     });
 
-    res.json({
+    // Respuesta
+    return res.json({
       accessToken,
       refreshToken,
       usuario: {
@@ -69,17 +79,20 @@ exports.login = async (req, res) => {
         rol: usuario.rol.nombre
       }
     });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: 'Error en el login' });
+    console.error("Error en login:", err);
+    return res.status(500).json({ msg: 'Error en el login' });
   }
 };
 
+// =========================
 // REFRESH TOKEN
-// body: { refreshToken }
+// =========================
 exports.refresh = async (req, res) => {
   try {
     const { refreshToken } = req.body;
+
     if (!refreshToken) {
       return res.status(400).json({ msg: 'refreshToken es requerido' });
     }
@@ -99,17 +112,18 @@ exports.refresh = async (req, res) => {
 
     const usuario = tokenDb.usuario;
 
-    // Opcional: rotar refresh token (mejor seguridad)
+    // Rotación del refresh token
     const nuevoRefreshToken = generarRefreshToken();
     const nuevaExpiracion = new Date();
     nuevaExpiracion.setDate(nuevaExpiracion.getDate() + REFRESH_TOKEN_DIAS);
 
-    // Revocar el anterior y crear uno nuevo
+    // Revocar token viejo
     await prisma.refreshToken.update({
       where: { id: tokenDb.id },
       data: { revoked: true }
     });
 
+    // Guardar nuevo token
     await prisma.refreshToken.create({
       data: {
         token: nuevoRefreshToken,
@@ -118,23 +132,27 @@ exports.refresh = async (req, res) => {
       }
     });
 
+    // Nuevo access token
     const newAccessToken = generarAccessToken(usuario);
 
-    res.json({
+    return res.json({
       accessToken: newAccessToken,
       refreshToken: nuevoRefreshToken
     });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: 'Error al refrescar token' });
+    console.error("Error en refresh:", err);
+    return res.status(500).json({ msg: 'Error al refrescar token' });
   }
 };
 
+// =========================
 // LOGOUT
-// body: { refreshToken }
+// =========================
 exports.logout = async (req, res) => {
   try {
     const { refreshToken } = req.body;
+
     if (!refreshToken) {
       return res.status(400).json({ msg: 'refreshToken es requerido' });
     }
@@ -144,14 +162,17 @@ exports.logout = async (req, res) => {
       data: { revoked: true }
     });
 
-    res.json({ msg: 'Sesión cerrada correctamente' });
+    return res.json({ msg: 'Sesión cerrada correctamente' });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: 'Error al cerrar sesión' });
+    console.error("Error en logout:", err);
+    return res.status(500).json({ msg: 'Error al cerrar sesión' });
   }
 };
 
-// OPCIONAL: para que el frontend valide quién está logueado
+// =========================
+// /me - Usuario actual
+// =========================
 exports.me = async (req, res) => {
   try {
     const usuario = await prisma.usuario.findUnique({
@@ -163,14 +184,15 @@ exports.me = async (req, res) => {
       return res.status(404).json({ msg: 'Usuario no encontrado' });
     }
 
-    res.json({
+    return res.json({
       id: usuario.id,
       nombre: usuario.nombre,
       email: usuario.email,
       rol: usuario.rol.nombre
     });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: 'Error al obtener usuario' });
+    console.error("Error en me:", err);
+    return res.status(500).json({ msg: 'Error al obtener usuario' });
   }
 };
